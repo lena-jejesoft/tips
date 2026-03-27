@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>산업(KSIC)–특허(IPC) 연계표 한계 분석</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a1a;
+    color: #e8e6e0;
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    padding: 40px 20px;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .header .badge {
+    display: inline-block;
+    background: rgba(12,68,124,0.35);
+    color: #85B7EB;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+  }
+  .header h1 {
+    font-size: 30px;
+    font-weight: 900;
+    line-height: 1.35;
+    margin-bottom: 10px;
+  }
+  .header h1 .highlight {
+    color: #F0997B;
+  }
+  .header .subtitle {
+    font-size: 15px;
+    color: #888;
+    font-weight: 300;
+  }
+
+  /* ── Section titles ── */
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #e8e6e0;
+  }
+  .section-desc {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 20px;
+  }
+
+  /* ── Heatmap grid ── */
+  .heatmap-wrapper {
+    margin-bottom: 56px;
+  }
+  .heatmap-stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 20px;
+  }
+  .stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #aaa;
+  }
+  .stat-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .stat-dot.mapped { background: #3B7DC9; }
+  .stat-dot.unmapped { background: #2c2c2a; border: 1px solid #444; }
+  .stat-dot.active-unmapped { background: #F0997B; }
+
+  .red-dot {
+    width: 8px; height: 8px;
+    background: #F0997B;
+    border-radius: 50%;
+    position: absolute;
+    top: 6px; right: 6px;
+  }
+
+  .heatmap {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+  .heatmap-cell {
+    position: relative;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 6px;
+    min-height: 100px;
+  }
+  .heatmap-cell.unmapped {
+    background: #2c2c2a;
+    border: 1px dashed #444;
+  }
+  .heatmap-cell.mapped {
+    border: 1px solid rgba(133,183,235,0.25);
+  }
+  .cell-code {
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.6;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
+  }
+  .cell-name {
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.3;
+    margin-bottom: 4px;
+  }
+  .cell-count {
+    font-size: 18px;
+    font-weight: 900;
+  }
+  .cell-label {
+    font-size: 10px;
+    opacity: 0.55;
+  }
+  .unmapped .cell-name { color: #666; }
+  .unmapped .cell-count { color: #555; font-size: 13px; font-weight: 400; }
+  .unmapped .cell-label { color: #555; }
+  .unmapped .cell-code { color: #555; }
+
+  /* ── Big stat callout ── */
+  .callout-bar {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin: 28px 0 0 0;
+    padding: 18px 0;
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
+  }
+  .callout-item {
+    text-align: center;
+  }
+  .callout-num {
+    font-size: 36px;
+    font-weight: 900;
+    color: #F0997B;
+  }
+  .callout-label {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+  }
+
+  /* ── Precision limit section ── */
+  .precision-section {
+    margin-bottom: 56px;
+  }
+  .precision-box {
+    background: #222;
+    border-radius: 12px;
+    padding: 28px 32px;
+    border: 1px solid #333;
+  }
+  .tree-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #85B7EB;
+    margin-bottom: 16px;
+  }
+  .tree {
+    font-family: 'Courier New', monospace;
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: #ccc;
+    margin-bottom: 20px;
+  }
+  .tree .code { color: #85B7EB; font-weight: 700; }
+  .tree .name { color: #e8e6e0; }
+  .tree .dim { color: #666; }
+
+  .ipc-chips-wrapper {
+    margin-bottom: 18px;
+  }
+  .ipc-chips-label {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 8px;
+  }
+  .ipc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .ipc-chip {
+    background: rgba(12,68,124,0.3);
+    color: #85B7EB;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(133,183,235,0.2);
+    font-family: 'Courier New', monospace;
+  }
+
+  .precision-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: rgba(240,153,123,0.08);
+    border: 1px solid rgba(240,153,123,0.3);
+    border-radius: 8px;
+    padding: 14px 18px;
+  }
+  .precision-alert .icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: #F0997B;
+  }
+  .precision-alert .text {
+    font-size: 13.5px;
+    color: #e8e6e0;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+  .precision-alert .text strong {
+    color: #F0997B;
+  }
+
+  /* ── Scenario cards ── */
+  .scenarios-section {
+    margin-bottom: 40px;
+  }
+  .scenarios-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .scenario-card {
+    background: #2c2c2a;
+    border: 1px solid #F0997B;
+    border-radius: 12px;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .scenario-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .scenario-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(240,153,123,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #F0997B;
+    font-size: 18px;
+  }
+  .scenario-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #F0997B;
+    letter-spacing: 1px;
+  }
+  .scenario-actor {
+    font-size: 13px;
+    font-weight: 700;
+    color: #85B7EB;
+  }
+  .scenario-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #ccc;
+  }
+  .scenario-text strong {
+    color: #F0997B;
+    font-weight: 700;
+  }
+  .scenario-bottom {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #444;
+  }
+  .scenario-verdict {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #F0997B;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid #2c2c2a;
+    font-size: 11px;
+    color: #555;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 800px) {
+    .heatmap { grid-template-columns: repeat(4, 1fr); }
+    .scenarios-grid { grid-template-columns: 1fr; }
+    .callout-bar { flex-direction: column; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">KSIC x IPC Gap Analysis</div>
+    <h1>산업-특허 연계표의 <span class="highlight">구조적 한계</span></h1>
+    <div class="subtitle">KSIC 11차 대분류 21개 x IPC 매핑 현황 -- 961건 전수 분석 결과</div>
+  </div>
+
+  <!-- Section 1: Heatmap -->
+  <div class="heatmap-wrapper">
+    <div class="section-title">KSIC 대분류 21개 전체 매핑 현황</div>
+    <div class="section-desc">한국표준산업분류 대분류 21개 중 IPC 특허코드 매핑이 존재하는 업종은 단 7개뿐입니다.</div>
+
+    <div class="heatmap-stats">
+      <div class="stat-chip"><div class="stat-dot mapped"></div> 매핑 있음 (7개)</div>
+      <div class="stat-chip"><div class="stat-dot unmapped"></div> 매핑 없음 (14개)</div>
+      <div class="stat-chip"><div class="stat-dot active-unmapped"></div> 특허 활발하나 매핑 없음 (5개)</div>
+    </div>
+
+    <div class="heatmap">
+      <!-- Row 1: A~G -->
+      <div class="heatmap-cell mapped" style="background:rgb(32,93,143)">
+        <div class="cell-code">A</div>
+        <div class="cell-name">농업, 임업 및 어업</div>
+        <div class="cell-count">5</div>
+        <div class="cell-label">IPC 코드</div>
+      </div>
+      <div class="heatmap-cell mapped" style="background:rgb(50,117,161)">
+        <div class="cell-code">B</div>
+        <div class="cell-name">광업</div>
+        <div class="cell-count">24</div>
+        <div class="cell-label">IPC 코드</div>
+      </div>
+      <div class="heatmap-cell mapped" style="background:rgb(133,183,235)">
+        <div class="cell-code">C</div>
+        <div class="cell-name">제조업</div>
+        <div class="cell-count">863</div>
+        <div class="cell-label">IPC 코드</div>
+      </div>
+      <div class="heatmap-cell mapped" style="background:rgb(37,100,149)">
+        <div class="cell-code">D</div>
+        <div class="cell-name">전기, 가스, 증기 및 공기조절 공급업</div>
+        <div class="cell-count">8</div>
+        <div class="cell-label">IPC 코드</div>
+      </div>
+      <div class="heatmap-cell mapped" style="background:rgb(36,98,148)">
+        <div class="cell-code">E</div>
+        <div class="cell-name">수도, 하수 및 폐기물 처리, 원료 재생업</div>
+        <div class="cell-count">7</div>
+        <div class="cell-label">IPC 코드</div>
+      </div>
+      <div class="heatmap-cell mapped" style="background:rgb(52,119,163)">
+        <div class="cell-code">F</div>
+        <div class="cell-name">건설업</div>
+        <div class="cell-count">25</div>
+        <div class="cell-label">IPC 코드</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="red-dot"></div>
+        <div class="cell-code">G</div>
+        <div class="cell-name">도매 및 소매업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+
+      <!-- Row 2: H~N -->
+      <div class="heatmap-cell unmapped">
+        <div class="red-dot"></div>
+        <div class="cell-code">H</div>
+        <div class="cell-name">운수 및 창고업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">I</div>
+        <div class="cell-name">숙박 및 음식점업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell mapped" style="background:rgb(53,121,164)">
+        <div class="cell-code">J</div>
+        <div class="cell-name">정보통신업</div>
+        <div class="cell-count">29</div>
+        <div class="cell-label">IPC 코드</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="red-dot"></div>
+        <div class="cell-code">K</div>
+        <div class="cell-name">금융 및 보험업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">L</div>
+        <div class="cell-name">부동산업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="red-dot"></div>
+        <div class="cell-code">M</div>
+        <div class="cell-name">전문, 과학 및 기술 서비스업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">N</div>
+        <div class="cell-name">사업시설 관리, 사업 지원 및 임대 서비스업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+
+      <!-- Row 3: O~U -->
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">O</div>
+        <div class="cell-name">공공 행정, 국방 및 사회보장 행정</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">P</div>
+        <div class="cell-name">교육 서비스업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="red-dot"></div>
+        <div class="cell-code">Q</div>
+        <div class="cell-name">보건업 및 사회복지 서비스업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">R</div>
+        <div class="cell-name">예술, 스포츠 및 여가관련 서비스업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">S</div>
+        <div class="cell-name">협회 및 단체, 수리 및 기타 개인 서비스업</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">T</div>
+        <div class="cell-name">가구 내 고용활동 및 자가소비 생산</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+      <div class="heatmap-cell unmapped">
+        <div class="cell-code">U</div>
+        <div class="cell-name">국제 및 외국기관</div>
+        <div class="cell-count">0건</div>
+        <div class="cell-label">매핑 없음</div>
+      </div>
+    </div>
+
+    <div class="callout-bar">
+      <div class="callout-item">
+        <div class="callout-num">66.7%</div>
+        <div class="callout-label">대분류 중 매핑 없음</div>
+      </div>
+      <div class="callout-item">
+        <div class="callout-num">89.8%</div>
+        <div class="callout-label">매핑의 제조업 편중</div>
+      </div>
+      <div class="callout-item">
+        <div class="callout-num">0건</div>
+        <div class="callout-label">서비스업 전체 매핑</div>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#888; margin-top:14px; line-height:1.5;">
+      * <span style="color:#F0997B;">&#9679;</span> 표시 5개 업종(금융, 보건, 전문서비스, 도소매, 운수)은 핀테크 / 디지털헬스 / 이커머스 등 연간 수만 건 규모의 특허 출원이 활발한 업종 (출처: WIPO <i>World Intellectual Property Indicators</i> 2024)
+    </div>
+  </div>
+
+  <!-- Section 2: Precision Limit -->
+  <div class="precision-section">
+    <div class="section-title">정밀도 한계 -- 반도체 산업 사례</div>
+    <div class="section-desc">KSIC 261(반도체 제조업)에 매핑된 IPC 코드 10개가 메모리/파운드리/팹리스/OSAT를 전혀 구분하지 못합니다.</div>
+
+    <div class="precision-box">
+      <div class="tree-title">KSIC 11차 반도체 분류 구조</div>
+      <div class="tree">
+<span class="code">261</span> <span class="name">반도체 제조업</span><br>
+<span class="dim"> ├─</span> <span class="code">2611</span> <span class="name">전자집적회로 제조업</span><br>
+<span class="dim"> │   ├─</span> <span class="code">26111</span> <span class="name">메모리용 전자집적회로 제조업</span><br>
+<span class="dim"> │   └─</span> <span class="code">26112</span> <span class="name">비메모리용 및 기타 전자집적회로 제조업</span><br>
+<span class="dim"> └─</span> <span class="code">2612</span> <span class="name">다이오드, 트랜지스터 및 유사 반도체 소자 제조업</span><br>
+<span class="dim">     ├─</span> <span class="code">26121</span> <span class="name">발광 다이오드 제조업</span><br>
+<span class="dim">     └─</span> <span class="code">26129</span> <span class="name">기타 반도체 소자 제조업</span>
+      </div>
+
+      <div class="ipc-chips-wrapper">
+        <div class="ipc-chips-label">▸ 연계표에서 261에 매핑된 IPC 코드 (10건)</div>
+        <div class="ipc-chips">
+          <div class="ipc-chip">H01L%</div>
+          <div class="ipc-chip">H10B%</div>
+          <div class="ipc-chip">H10D%</div>
+          <div class="ipc-chip">H10F%</div>
+          <div class="ipc-chip">H10H%</div>
+          <div class="ipc-chip">H10K%</div>
+          <div class="ipc-chip">H10N%</div>
+          <div class="ipc-chip">G11C%</div>
+          <div class="ipc-chip">C30B%</div>
+          <div class="ipc-chip">H05B 45/%</div>
+        </div>
+      </div>
+
+      <div class="precision-alert">
+        <div class="icon">&#9888;</div>
+        <div class="text">
+          이 10개 코드 안에 <strong>메모리(삼성/SK) / 파운드리(삼성) / 팹리스(AI칩/차량용칩) / OSAT(패키징/테스트)</strong>가
+          전부 섞여 있어 <strong>세부 업종 구분이 불가능</strong>합니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Scenario Cards -->
+  <div class="scenarios-section">
+    <div class="section-title">실무에서 이게 왜 문제인가</div>
+    <div class="section-desc">산업-특허 연계표의 구조적 한계가 실무 의사결정을 어떻게 가로막는지, 3가지 시나리오로 보여드립니다.</div>
+
+    <div class="scenarios-grid">
+      <!-- Scenario A -->
+      <div class="scenario-card">
+        <div class="scenario-top">
+          <div class="scenario-icon">&#9888;</div>
+          <div>
+            <div class="scenario-label">SCENARIO A</div>
+            <div class="scenario-actor">VC -- 스타트업 투자 평가</div>
+          </div>
+        </div>
+        <div class="scenario-text">
+          AI 반도체 스타트업을 평가하려 하는데, <strong>KSIC 26112 안에 AI칩도 차량용칩도 다 섞여 있어서</strong> 동종 업계 비교군을 구성할 수 없다.
+        </div>
+        <div class="scenario-bottom">
+          <div class="scenario-verdict">&#10005; 비교군 구성 불가 → 밸류에이션 근거 부재</div>
+        </div>
+      </div>
+
+      <!-- Scenario B -->
+      <div class="scenario-card">
+        <div class="scenario-top">
+          <div class="scenario-icon">&#9888;</div>
+          <div>
+            <div class="scenario-label">SCENARIO B</div>
+            <div class="scenario-actor">통계청 -- 산업 규모 산출</div>
+          </div>
+        </div>
+        <div class="scenario-text">
+          플랫폼 커머스 산업 규모를 산출하려 하는데, 도매/소매업(G)에 <strong>매핑 자체가 없어서</strong> 특허 기반 기술 역량 분석이 원천적으로 불가능하다.
+        </div>
+        <div class="scenario-bottom">
+          <div class="scenario-verdict">&#10005; 매핑 부재 → 특허 기반 분석 불가</div>
+        </div>
+      </div>
+
+      <!-- Scenario C -->
+      <div class="scenario-card">
+        <div class="scenario-top">
+          <div class="scenario-icon">&#9888;</div>
+          <div>
+            <div class="scenario-label">SCENARIO C</div>
+            <div class="scenario-actor">글로벌 PE -- 크로스보더 투자</div>
+          </div>
+        </div>
+        <div class="scenario-text">
+          한국 반도체 기업에 투자하려는데, <strong>KSIC→NAICS 매핑이 대분류 수준</strong>이라 미국 Fabless 기업과 1:1 정밀 비교가 안 된다.
+        </div>
+        <div class="scenario-bottom">
+          <div class="scenario-verdict">&#10005; 크로스보더 비교 불가 → 글로벌 딜 지연</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    데이터 출처: 산업(KSIC)-특허(IPC) 연계표 (KSIC 11차 기준) / 분석 기준일 2026-03-27
+  </div>
+
+</div>
+</body>
+</html>
